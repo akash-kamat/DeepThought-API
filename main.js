@@ -1,7 +1,7 @@
 const express = require("express")
 const cors = require("cors")
-const { MongoClient } = require("mongodb")
-const bodyParser = require('body-parser');
+const { MongoClient, ObjectId } = require("mongodb")
+
 const axios = require('axios')
 const multer = require('multer');
 const fs = require('fs');
@@ -19,9 +19,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 const app = express()
 app.use(cors())
-// app.use(express.json())
-// app.use(bodyParser.urlencoded({ extended: true }));
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3000;
 
 const connectionString = "mongodb+srv://akashkamat:akashkamat10@mytestdb.ducrb.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
 const client = new MongoClient(connectionString);
@@ -57,21 +55,67 @@ app.get("/", (req, res) => {
 })
 app.post("/api/v3/app/events", upload.single('files'), async (req, res) => {
     try {
-        console.log(req.body)
-        res.json("added event");
-        console.log(req.body)
         var newImg = fs.readFileSync(req.file.path);
-        // encode the file as a base64 string.
         var encImg = newImg.toString('base64');
         const img = {
-            img: Buffer(encImg, 'base64')
+            file: Buffer.from(encImg, 'base64')
         };
-        const event = Object.assign(req, body, img)
-        await collection.insertOne(event);
+        const event = Object.assign(req.body, img)
+        const inserted = await collection.insertOne(event);
+        res.json(inserted.insertedId);
     } catch (error) {
         console.log(error)
     }
 });
+app.put("/api/v3/app/events", upload.single('files'), async (req, res) => {
+    try {
+
+        var newImg = fs.readFileSync(req.file.path);
+        var encImg = newImg.toString('base64');
+        const img = {
+            file: Buffer.from(encImg, 'base64')
+        };
+        const event = Object.assign(req.body, img)
+        const inserted = await collection.insertOne(event);
+        res.json(inserted.insertedId);
+    } catch (error) {
+        console.log(error)
+    }
+});
+app.get("/api/v3/app/events", async (req, res) => {
+    try {
+        const eventId = req.query.id
+        if (eventId) {
+            const data = await collection.findOne(ObjectId(eventId))
+            if (data == null) {
+                res.json("event not found")
+            } else {
+                res.json(data)
+            }
+
+        }
+        else {
+            const limit = parseInt(req.query.limit)
+            const skip = parseInt(req.query.page)
+            const data = await collection.find().limit(limit).skip((limit * skip) - limit)
+            data.forEach(doc => {
+                console.log(doc)
+            })
+            res.json("done")
+        }
+    } catch (error) {
+        console.log(error)
+    }
+})
+app.delete("/api/v3/app/events/:id", async (req, res) => {
+    try {
+        const eventId = req.params.id
+        collection.deleteOne({ "_id": ObjectId(eventId) })
+        res.json(`deleted event ${eventId}`)
+    } catch (error) {
+        console.log(error)
+    }
+})
 
 app.listen(port, () => {
     console.log("server is up on port:", port)
